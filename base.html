@@ -1,31 +1,18 @@
-<!DOCTYPE html>
-<html lang="pt_BR">
-<head>
-    <meta charset="UTF-8">
+{%  extends 'bootstrap/base.html' %}
+
+{% block navbar %}
+    {{ nav.menunav.render() }}
+{% endblock %}
+{% block content %}
 
 
-    {% if titulo  %}
+<div class="container">
 
-        <title>{{ titulo }}</title>
-
-    {% else %}
-
-        <title>Título da página</title>
-
-    {% endif %}
+    {% block app_content %}
 
 
+    {% endblock %}
 
-</head>
-<body>
+</div>
 
-    <h1><a href="/">Aplicação web</a></h1>
-
-    <HR>
-
-    {% block content %} {% endblock %}
-
-
-
-</body>
-</html>
+{% endblock %}
