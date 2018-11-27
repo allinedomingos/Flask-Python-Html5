@@ -1,5 +1,8 @@
 flask
 Jinja2
 SQLAlchemy
-
-
+flask-wtf
+flask-sqlalchemy
+flask-login
+flask-bootstrap
+flask-nav

@@ -1,67 +1,101 @@
-from flask import Flask, render_template, redirect, url_for, request
-from sqlalchemy import create_engine
-from sqlalchemy.ext.automap import automap_base
-from sqlalchemy.orm import sessionmaker
+from flask import Flask, render_template, session, redirect, url_for
+from flask_bootstrap import Bootstrap
+from flask_nav import Nav
+from flask_nav.elements import Navbar, View, Subgroup, Link
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import FlaskForm
+from werkzeug.security import generate_password_hash, check_password_hash
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired
 
 app = Flask(__name__)
 
 SECRET_KEY = "stringAleatoria"  #proteção contra ataques
 app.secret_key = SECRET_KEY
 
-engine = create_engine("sqlite:///lab05-flask.sqlite")
-Session = sessionmaker(bind=engine)
-Base = automap_base()
-Base.prepare(engine,reflect=True)
+bootstrap = Bootstrap(app)
 
-Pessoa = Base.classes.Pessoa
-Telefones = Base.classes.Telefones
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///exemplo-02.sqlite'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-@app.route('/listar')
-def listar_pessoas():
+db = SQLAlchemy(app)
 
-    id= str(request.args.get('id'))
-    sessionSQL = Session()
+nav = Nav()
 
-    if id == 'None':
+nav.init_app(app)
 
-        pessoas = sessionSQL.query(Pessoa).all()
-
-        sessionSQL.close()
-
-        return render_template('listar.html',lista_pessoas=pessoas)
-    else:
-         pessoa = sessionSQL.query(Pessoa).filter(Pessoa.idPessoa == id).first()
-         if pessoa is not None:
-             sessionSQL.delete(pessoa)
-             sessionSQL.commit()
-             sessionSQL.close()
-         return redirect(url_for('listar_pessoas'))
+@nav.navigation()
+def menunav():
+    menu = Navbar('Minha aplicação')
+    menu.items = [View('Nome','hello_world'), View('Login','autenticar')]
+    menu.items.append(Subgroup('Pessoas', View('Aluno','hello_world')))
+    menu.items.append(Link('Ajuda','https://www.google.com'))
+    return menu
 
 
-@app.route('/inserir', methods=['GET','POST'])
-def inserir():
-    if request.method == 'GET':
-        return render_template('inserir.html')
-    else:
-        sessionSQL = Session()
+class Usuario(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(40))
+    password = db.Column(db.String(130))
+    email = db.Column(db.String(130))
 
-        nome = request.form['nome']
 
-        pessoa = Pessoa()
-        pessoa.nome = nome
+    # def __init__(self, **kwargs):
+    #     super.__init__(kwargs)
+    #     self.username = kwargs.pop('username')
+    #     self.email = kwargs.pop('email')
+    #     self.password = generate_password_hash(kwargs.pop('password'))
 
-        sessionSQL.add(pessoa)
-        sessionSQL.commit()
-        sessionSQL.close()
-        return redirect(url_for('listar_pessoas'))
+    def set_password(self,password):
+        self.password= generate_password_hash(password)
 
-@app.route('/index')
+    def check_password(self, password):
+        return check_password_hash(self.password, password)
+
+
+class LoginForm(FlaskForm):
+    username = StringField('Nome do usuário', validators=[DataRequired()])
+    password = PasswordField('Senha', validators=[DataRequired()])
+    submit = SubmitField('Entrar')
+
+
+@app.route('/login', methods=['GET','POST'])
+def autenticar():
+    formulario = LoginForm()
+
+    if formulario.validate_on_submit():
+        #fazer autenticacao do usuario
+        usuario = Usuario.query.filter_by(username=formulario.username.data).first_or_404()
+        if(usuario.check_password(formulario.password.data)):
+            session['logged_in'] = True
+            session['usuario'] = usuario.username
+        return render_template('autenticado.html')
+
+    return render_template('login.html',form=formulario)
+
+
+@app.route('/painel')
+def painel():
+
+    if session.get('logged_in') is True:
+
+        usuario = Usuario.query.filter_by(username=session.get('usuario')).first_or_404()
+        return render_template('dados.html',title="Usuário autenticado",user=usuario)
+
+    return redirect(url_for('hello_world'))
+
+
+@app.route('/logout')
+def sair():
+    session['logged_in']=False
+    return redirect(url_for('autenticar'))
+
+
 @app.route('/')
 def hello_world():
-    return render_template('index.html',titulo="Título da Página")
+    return render_template('index.html')
 
+#https://github.com/bcd29008/python-flask-wtf-bootstrap
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0',debug=True)  #apache,nginx, GUnicorn na produção   host= para rodar em todas as interfaces, sem roda somente localhost, debug funciona no terminal
 
 
